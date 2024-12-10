@@ -1,0 +1,18 @@
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0 # last image before you need to sent pw with env var
+    container_name: opensearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - "discovery.type=single-node"
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0 # Make sure the version of opensearch-dashboards matches the version of opensearch installed on other nodes
+    container_name: opensearch-dashboards
+    ports:
+      - 5601:5601 # Map host port 5601 to container port 5601
+    expose:
+      - "5601" # Expose port 5601 for web access to OpenSearch Dashboards
+    environment:
+      OPENSEARCH_HOSTS: '["https://opensearch:9200"]' # Define the OpenSearch nodes that OpenSearch Dashboards will query
