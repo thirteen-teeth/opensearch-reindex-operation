@@ -1,0 +1,21 @@
+{
+  "index_patterns": ["my-index-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1
+    },
+    "mappings": {
+      "properties": {
+        "message": {
+          "type": "text"
+        },
+        "woop-woop": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date"
+        }
+      }
+    }
+  }
+}

@@ -16,8 +16,8 @@ INDEX_TEMPLATE = 'my-index-template'
 LIFECYCLE_POLICY = 'my-lifecycle-policy'
 
 # create opensearch index mapping template
-def create_index_template():
-    with open('index_template.json') as f:
+def create_index_template(template_file_name):
+    with open(template_file_name) as f:
         template = json.load(f)
     response = requests.put(f'{OPENSEARCH_URL}/_index_template/{INDEX_TEMPLATE}', json=template, auth=(USERNAME, PASSWORD), verify=False)
     response.raise_for_status()
@@ -42,6 +42,7 @@ def delete_index(index):
     print(f"Index {index} deleted")
 
 # apply create_index 3 times to create 3 indices
+# add a 4th index with a different mapping
 def create_indices():
     for i in range(3):
         create_index(f'{INDEX_PREFIX}-00{i}')
@@ -49,12 +50,20 @@ def create_indices():
         for _ in range(5):
             add_document(f'{INDEX_PREFIX}-00{i}')
     print("Indices created")
-
+    # create a 4th index with a different mapping
+    with open('different_mapping.json') as f:
+        different_mapping = json.load(f)
+    # change index mapping template to different mapping
+    create_index_template('different_mapping.json')
+    create_index(f'{INDEX_PREFIX}-003')
+    # add 10 documents to the 4th index
+    for _ in range(10):
+        add_document(f'{INDEX_PREFIX}-003')
 # delete indices
 def delete_indices():
-    for i in range(3):
-        delete_index(f'{INDEX_PREFIX}-00{i}')
-    print("Indices deleted")
+    # apply cluster setting to allow wildcard delete
+    response = requests.put(f'{OPENSEARCH_URL}/_cluster/settings', json={'persistent': {'action.destructive_requires_name': 'false'}}, auth=(USERNAME, PASSWORD), verify=False)
+    delete_index(f'{INDEX_PREFIX}-*')
 
 # create opensearch index lifecycle policy
 def create_lifecycle_policy():
@@ -91,7 +100,7 @@ if __name__ == '__main__':
 
     if action == '--create':
         print("Creating index template")
-        create_index_template()
+        create_index_template('index_template.json')
         print("Creating indices")
         create_indices()
         print("Creating lifecycle policy")
