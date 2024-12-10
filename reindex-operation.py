@@ -48,17 +48,16 @@ def create_state():
     # loop through the older indices and compare the mapping
     state = {}
     for index in indices[:-1]:
-        print(f"Checking mapping for {index['index']}")
+        # print(f"Checking mapping for {index['index']}")
         mapping = get_mapping(index['index'])
-        print(f"Mapping: {mapping}")
-        
-        print(f"mapping[index['index']]['mappings']: {mapping[index['index']]['mappings']}")
-        print(f"latest_mapping['mappings']: {latest_mapping}")
-
-        
+        # print(f"Mapping: {mapping}")
+        # print(f"mapping[index['index']]['mappings']: {mapping[index['index']]['mappings']}")
+        # print(f"latest_mapping['mappings']: {latest_mapping}")
         if mapping[index['index']]['mappings'] != latest_mapping:
             print(f"Mapping for {index['index']} does not match the latest index {latest_index['index']}.")
             state[index['index']] = {'mapping': mapping}
+        else:
+            print(f"Mapping for {index['index']} matches the latest index {latest_index['index']}.")
 
     return state
 
