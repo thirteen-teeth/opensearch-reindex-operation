@@ -5,14 +5,23 @@ import time
 from datetime import datetime
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
-# Configuration
-OPENSEARCH_URL = 'https://localhost:9200'
-INDEX_PATTERN = 'my-index-*'
-REINDEX_SUFFIX = 'v2'
-STATE_FILE = 'reindex_state.json'
-# ISM_POLICY_ID = 'my-ism-policy'
-USERNAME = 'admin'
-PASSWORD = 'admin'
+parser = argparse.ArgumentParser(description='Reindex operation script.')
+parser.add_argument('--opensearch-url', required=True, help='The URL of the Opensearch cluster.')
+parser.add_argument('--index-pattern', required=True, help='The pattern of the indices to reindex.')
+parser.add_argument('--reindex-suffix', required=True, help='The suffix to append to the reindexed indices.')
+parser.add_argument('--state-file', required=True, help='The file to save the state of the reindex operation.')
+parser.add_argument('--username', required=True, help='The username to use for authentication.')
+parser.add_argument('--password', required=True, help='The password to use for authentication.')
+parser.add_argument('--dry-run', action='store_true', help='Perform a dry run without making any changes.')
+args = parser.parse_args()
+
+OPENSEARCH_URL = args.opensearch_url
+INDEX_PATTERN = args.index_pattern
+REINDEX_SUFFIX = args.reindex_suffix
+STATE_FILE = args.state_file
+USERNAME = args.username
+PASSWORD = args.password
+DRY_RUN = args.dry_run
 
 # check if the state file exists, create an empty state file if it does not exist
 def load_state():
@@ -104,48 +113,52 @@ def get_doc_count(index):
     response.raise_for_status()
     return response.json()['count']
 
-def main(dry_run):
+def main():
     state = load_state()
-    print(f"State: {state}")
+    # print(f"State: {state}")
     if not state:
         state = create_state()
     else:
         print("State already exists")
-    # pretty print the state
-    # print(json.dumps(state, indent=4))
-    print(f"State: {state}")
-    if not dry_run:
+    # print(f"State: {state}")
+
+    if not DRY_RUN:
         save_state(state)
 
-    for index, mapping in state.items():
-        print(f"Reindexing {index} due to mapping changes.")
-        if dry_run:
-            print(f"Would start reindex task for {index} to {index}-{REINDEX_SUFFIX}")
+    # Find the first index that needs reindexing
+    index_to_reindex = next(iter(state), None)
+
+    if index_to_reindex:
+        print(f"Reindexing {index_to_reindex} due to mapping changes.")
+        if DRY_RUN:
+            print(f"Would start reindex task for {index_to_reindex} to {index_to_reindex}-{REINDEX_SUFFIX}")
         else:
-            task = start_reindex(index, f"{index}-{REINDEX_SUFFIX}")
+            task = start_reindex(index_to_reindex, f"{index_to_reindex}-{REINDEX_SUFFIX}")
             print(f"Reindex task started: {task}")
-            state[index] = {'task': task}            
+            state[index_to_reindex] = {'task': task}
             save_state(state)
 
-    if not dry_run:
-        # check the status of the reindex task every 5 seconds
-        while state:
-            for index in list(state.keys()):
-                task_id = state[index]['task']
-                status = check_reindex_status(task_id)
+            # Check the status of the reindex task every 5 seconds
+            while True:
+                status = check_reindex_status(task)
                 if status['completed']:
-                    print(f"Reindex task {task_id} completed.")
-                    del state[index]
+                    print(f"Reindex task {task} completed.")
+                    del state[index_to_reindex]
+                    save_state(state)
+                    break
                 else:
-                    print(f"Reindex task {task_id} still running.")
-            save_state(state)
-            time.sleep(5)
-        print("All reindex tasks completed.")
+                    print(f"Reindex task {task} still running.")
+                time.sleep(5)
+
+        if not state:
+            print("All reindex tasks completed.")
+        else:
+            print("One reindex task completed. Run the script again for the next index.")
     else:
+        print("No indices need reindexing.")
+
+    if DRY_RUN:
         print("Dry run completed. No changes were made.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Reindex operation script.')
-    parser.add_argument('--dry-run', action='store_true', help='Perform a dry run without making any changes.')
-    args = parser.parse_args()
-    main(args.dry_run)
+    main()
