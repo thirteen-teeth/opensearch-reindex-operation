@@ -108,7 +108,6 @@ def main(dry_run):
         else:
             task = start_reindex(index, f"{index}-{REINDEX_SUFFIX}")
             print(f"Reindex task started: {task}")
-            # save task id to state inside the tasks key
             state[index] = {'task': task}            
             save_state(state)
 
