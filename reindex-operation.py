@@ -30,27 +30,43 @@ def load_state():
 def create_state():
     print("Creating state...")
     indices = get_indices(INDEX_PATTERN)
+    # print(f"Indices: {indices}")
+    # print(f"Indices type: {type(indices)}")
     if not indices:
         print("No indices found.")
         return
+    indices = json.loads(indices[0])
+    indices = sorted(indices, key=lambda x: x['creation.date'])
+    
+    latest_index = indices[-1]
+    print(f"Latest index: {latest_index['index']}")
 
-    latest_index = max(indices)
-    print(f"Latest index: {latest_index}")
+    latest_mapping = get_mapping(latest_index['index'])
+    latest_mapping = latest_mapping[latest_index['index']]['mappings']
+    print(f"Latest mapping: {latest_mapping}")
 
+    # loop through the older indices and compare the mapping
     state = {}
-    for index in indices:
-        if index != latest_index:
-            mapping_latest = get_mapping(latest_index)
-            mapping_index = get_mapping(index)
-            if mapping_latest != mapping_index:
-                state[index] = mapping_index
+    for index in indices[:-1]:
+        print(f"Checking mapping for {index['index']}")
+        mapping = get_mapping(index['index'])
+        print(f"Mapping: {mapping}")
+        
+        print(f"mapping[index['index']]['mappings']: {mapping[index['index']]['mappings']}")
+        print(f"latest_mapping['mappings']: {latest_mapping}")
+
+        
+        if mapping[index['index']]['mappings'] != latest_mapping:
+            print(f"Mapping for {index['index']} does not match the latest index {latest_index['index']}.")
+            state[index['index']] = {'mapping': mapping}
 
     return state
 
 # save the state to the state file
 def save_state(state):
     with open(STATE_FILE, 'w') as f:
-        json.dump(state, f)
+        # pretty print the state
+        json.dump(state, f, indent=4)
 
 # check the status of the reindex task
 def check_reindex_status(task_id):
@@ -77,7 +93,8 @@ def get_mapping(index):
     return response.json()
 
 def get_indices(pattern):
-    response = requests.get(f'{OPENSEARCH_URL}/_cat/indices/{pattern}?h=index', auth=(USERNAME, PASSWORD), verify=False)
+    # get a list of indices that match the pattern, in JSON format with index name and creation date
+    response = requests.get(f'{OPENSEARCH_URL}/_cat/indices/{pattern}?format=json&h=index,creation.date', auth=(USERNAME, PASSWORD), verify=False)
     response.raise_for_status()
     return [line.strip() for line in response.text.splitlines()]
 
@@ -124,7 +141,6 @@ def main(dry_run):
                     print(f"Reindex task {task_id} still running.")
             save_state(state)
             time.sleep(5)
-
         print("All reindex tasks completed.")
     else:
         print("Dry run completed. No changes were made.")
