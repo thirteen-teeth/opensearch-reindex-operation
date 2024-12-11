@@ -103,6 +103,9 @@ def get_mapping(index):
 def get_indices(pattern):
     # get a list of indices that match the pattern, in JSON format with index name and creation date
     response = requests.get(f'{OPENSEARCH_URL}/_cat/indices/{pattern}?format=json&h=index,creation.date', auth=(USERNAME, PASSWORD), verify=False)
+    # return an empty object if no indices are found
+    if response.status_code == 404:
+        return {}
     response.raise_for_status()
     return [line.strip() for line in response.text.splitlines()]
 
