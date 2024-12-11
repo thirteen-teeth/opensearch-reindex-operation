@@ -78,6 +78,7 @@ def save_state(state):
 
 # check the status of the reindex task
 def check_reindex_status(task_id):
+    print(f'{OPENSEARCH_URL}/_tasks/{task_id}')
     response = requests.get(f'{OPENSEARCH_URL}/_tasks/{task_id}', auth=(USERNAME, PASSWORD), verify=False)
     response.raise_for_status()
     # pretty print response
@@ -151,13 +152,15 @@ def main():
                 while True:
                     status = check_reindex_status(task)
                     print(f"Status: {status}")
+                    print(type(status))
+                    print(dir(status))
                     if status['completed'] == True:
                         print(f"Reindex task {task} completed.")
                         del state[index_to_reindex]
                         save_state(state)
                         break
                     # check if task has failures
-                    elif 'failures' in status:
+                    elif 'failures' in status['response']:
                         print(f"Reindex task {task} failed.")
                         del state[index_to_reindex]
                         save_state(state)
