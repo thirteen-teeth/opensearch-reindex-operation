@@ -126,39 +126,40 @@ def main():
         save_state(state)
 
     # Find the first index that needs reindexing
-    index_to_reindex = next(iter(state), None)
+    while state:
+        index_to_reindex = next(iter(state), None)
 
-    if index_to_reindex:
-        print(f"Reindexing {index_to_reindex} due to mapping changes.")
+        if index_to_reindex:
+            print(f"Reindexing {index_to_reindex} due to mapping changes.")
+            if DRY_RUN:
+                print(f"Would start reindex task for {index_to_reindex} to {index_to_reindex}-{REINDEX_SUFFIX}")
+                del state[index_to_reindex]
+            else:
+                task = start_reindex(index_to_reindex, f"{index_to_reindex}-{REINDEX_SUFFIX}")
+                print(f"Reindex task started: {task}")
+                state[index_to_reindex] = {'task': task}
+                save_state(state)
+
+                # Check the status of the reindex task every 5 seconds
+                while True:
+                    status = check_reindex_status(task)
+                    if status['completed']:
+                        print(f"Reindex task {task} completed.")
+                        del state[index_to_reindex]
+                        save_state(state)
+                        break
+                    else:
+                        print(f"Reindex task {task} still running.")
+                    time.sleep(5)
+
         if DRY_RUN:
-            print(f"Would start reindex task for {index_to_reindex} to {index_to_reindex}-{REINDEX_SUFFIX}")
-        else:
-            task = start_reindex(index_to_reindex, f"{index_to_reindex}-{REINDEX_SUFFIX}")
-            print(f"Reindex task started: {task}")
-            state[index_to_reindex] = {'task': task}
-            save_state(state)
+            print("Dry run completed. No changes were made.")
+            break
 
-            # Check the status of the reindex task every 5 seconds
-            while True:
-                status = check_reindex_status(task)
-                if status['completed']:
-                    print(f"Reindex task {task} completed.")
-                    del state[index_to_reindex]
-                    save_state(state)
-                    break
-                else:
-                    print(f"Reindex task {task} still running.")
-                time.sleep(5)
-
-        if not state:
-            print("All reindex tasks completed.")
-        else:
-            print("One reindex task completed. Run the script again for the next index.")
+    if not state:
+        print("All reindex tasks completed.")
     else:
-        print("No indices need reindexing.")
-
-    if DRY_RUN:
-        print("Dry run completed. No changes were made.")
+        print("Some reindex tasks are still pending. Please check the state and rerun the script if necessary.")
 
 if __name__ == "__main__":
     main()
