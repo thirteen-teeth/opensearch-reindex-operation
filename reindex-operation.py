@@ -115,12 +115,10 @@ def get_doc_count(index):
 
 def main():
     state = load_state()
-    # print(f"State: {state}")
     if not state:
         state = create_state()
     else:
         print("State already exists")
-    # print(f"State: {state}")
 
     if not DRY_RUN:
         save_state(state)
@@ -130,12 +128,18 @@ def main():
         index_to_reindex = next(iter(state), None)
 
         if index_to_reindex:
+            # check if the new target index already exists
+            target_index = f"{index_to_reindex}-{REINDEX_SUFFIX}"
+            if get_indices(target_index):
+                print(f"Target index: {target_index} already exists.")
+                print("Please check or possibly delete the target index and rerun the script.")
+                break
             print(f"Reindexing {index_to_reindex} due to mapping changes.")
             if DRY_RUN:
-                print(f"Would start reindex task for {index_to_reindex} to {index_to_reindex}-{REINDEX_SUFFIX}")
+                print(f"Would start reindex task for {index_to_reindex} to {target_index}")
                 del state[index_to_reindex]
             else:
-                task = start_reindex(index_to_reindex, f"{index_to_reindex}-{REINDEX_SUFFIX}")
+                task = start_reindex(index_to_reindex, f"{target_index}")
                 print(f"Reindex task started: {task}")
                 state[index_to_reindex] = {'task': task}
                 save_state(state)
@@ -143,8 +147,15 @@ def main():
                 # Check the status of the reindex task every 5 seconds
                 while True:
                     status = check_reindex_status(task)
-                    if status['completed']:
+                    print(f"Status: {status}")
+                    if status['completed'] == True:
                         print(f"Reindex task {task} completed.")
+                        del state[index_to_reindex]
+                        save_state(state)
+                        break
+                    # check if task has failures
+                    elif 'failures' in status:
+                        print(f"Reindex task {task} failed.")
                         del state[index_to_reindex]
                         save_state(state)
                         break
